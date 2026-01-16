@@ -1,6 +1,7 @@
 package com.green.hwinfo.ui.screens
 
 import android.net.Uri
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateIntOffsetAsState
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.green.hwinfo.data.AppConfig
 import com.green.hwinfo.data.SensorConfigManager
 import com.green.hwinfo.data.TileConfig
@@ -129,6 +131,9 @@ fun MonitorScreen(
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? -> 
         uri?.let {
+            try {
+                context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (e: Exception) {}
             val newConfig = appConfig.copy(backgroundImageUri = it.toString())
             appConfig = newConfig
             configManager.saveAppConfig(newConfig)
@@ -146,12 +151,16 @@ fun MonitorScreen(
                     Spacer(Modifier.height(16.dp))
                     Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)) { Text("Disconnect") }
                     Divider(Modifier.padding(vertical = 16.dp), color = Color.Gray)
-                    Text("Design", color = Color.Gray)
-                    Button(onClick = { launcher.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Text("Change Background") }
+                    Text("Background", color = Color.Gray)
+                    Row {
+                        Button(onClick = { launcher.launch("image/*") }, modifier = Modifier.weight(1f)) { Text("Select") }
+                        Spacer(Modifier.width(8.dp))
+                        IconButton(onClick = { appConfig = appConfig.copy(backgroundImageUri = null); configManager.saveAppConfig(appConfig) }) { Icon(Icons.Default.Delete, null, tint = NeonRed) }
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = appConfig.useGlassEffect, onCheckedChange = { 
                             appConfig = appConfig.copy(useGlassEffect = it); configManager.saveAppConfig(appConfig) 
-                        }); Text("Glass Effect")
+                        }); Text("Blur Background (Glass)")
                     }
                     Text("Grid Size: ${appConfig.gridSizeDp}", color = Color.Gray)
                     Slider(value = appConfig.gridSizeDp.toFloat(), onValueChange = { 
@@ -179,10 +188,10 @@ fun MonitorScreen(
         }
     ) {
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-            if (appConfig.backgroundImageUri != null) {
-                AsyncImage(model = appConfig.backgroundImageUri, contentDescription = null, contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().blur(if (appConfig.useGlassEffect) 0.dp else 10.dp))
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)))
+            if (!appConfig.backgroundImageUri.isNullOrEmpty()) {
+                AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(appConfig.backgroundImageUri).crossfade(true).build(),
+                    contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur(if (appConfig.useGlassEffect) 20.dp else 0.dp))
+                Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)))
             } else if (isEditMode) { GridBackground(appConfig.gridSizeDp) }
 
             IconButton(onClick = { scope.launch { drawerState.open() } }, modifier = Modifier.padding(16.dp).statusBarsPadding()) {
